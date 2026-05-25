@@ -5,6 +5,7 @@ import Combine
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var cancellables = Set<AnyCancellable>()
+    private var prefsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -61,7 +62,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openPreferences() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        if prefsWindow == nil {
+            let view = LabelEditorView().environmentObject(SpaceManager.shared)
+            let controller = NSHostingController(rootView: view)
+            let window = NSWindow(contentViewController: controller)
+            window.title = "Switchr — Edit Labels"
+            window.styleMask = [.titled, .closable]
+            window.isReleasedWhenClosed = false
+            prefsWindow = window
+        }
+        prefsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 }
