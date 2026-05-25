@@ -52,18 +52,23 @@ final class SpaceManager: ObservableObject {
 
         let saved = UserDefaults.standard.dictionary(forKey: labelsKey) as? [String: String] ?? [:]
         var result: [SpaceInfo] = []
+        var seen = Set<String>()
         var activeID = ""
         var idx = 0
 
         for display in raw {
-            let spaceList = display["Spaces"] as? [[String: Any]] ?? []
             let current = display["Current Space"] as? [String: Any] ?? [:]
-            if let uuid = current["uuid64"] as? String, !uuid.isEmpty {
-                activeID = uuid
-            }
-            for space in spaceList {
-                guard let uuid = space["uuid64"] as? String,
-                      (space["type"] as? Int ?? 0) == 0 else { continue }
+            if let uuid = spaceID(from: current) { activeID = uuid }
+
+            // Combine Spaces + Other Spaces — macOS version determines which
+            // array holds regular desktops vs fullscreen spaces.
+            var allSpaces: [[String: Any]] = []
+            if let s = display["Spaces"] as? [[String: Any]] { allSpaces += s }
+            if let s = display["Other Spaces"] as? [[String: Any]] { allSpaces += s }
+
+            for space in allSpaces {
+                guard let uuid = spaceID(from: space), !seen.contains(uuid) else { continue }
+                seen.insert(uuid)
                 idx += 1
                 result.append(SpaceInfo(id: uuid, index: idx, customLabel: saved[uuid] ?? ""))
             }
@@ -71,6 +76,16 @@ final class SpaceManager: ObservableObject {
 
         spaces = result
         if !activeID.isEmpty { currentSpaceID = activeID }
+    }
+
+    // Extracts a stable identifier from a space dict.
+    // Prefers uuid64 (persists across reboots); falls back to the integer id64.
+    private func spaceID(from dict: [String: Any]) -> String? {
+        if let uuid = dict["uuid64"] as? String, !uuid.isEmpty { return uuid }
+        if let uuid = dict["uuid"] as? String, !uuid.isEmpty { return uuid }
+        if let id = dict["id64"] as? Int { return "id:\(id)" }
+        if let id = dict["ManagedSpaceID"] as? Int { return "id:\(id)" }
+        return nil
     }
 
     func setLabel(_ label: String, for spaceID: String) {
